@@ -19,4 +19,4 @@ class Linear(nn.Linear):
                 torch.log((1+weight/max_val) / (1-weight/max_val))
         else:
             self.count = 1
-        return F.linear(x, weight, bias=True)
+        return F.linear(x, weight)
