@@ -5,8 +5,8 @@ from torch.nn import functional as F
 
 
 class Linear(nn.Linear):
-    def init(self, in_features, out_features, bias=True):
-        super(Linear, self).init(in_features, out_features, bias)
+    def __init__(self, in_features, out_features, bias=True):
+        super(Linear, self).__init__(in_features, out_features, bias)
         self.count = 0
 
     def forward(self, x):
