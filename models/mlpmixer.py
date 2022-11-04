@@ -2,7 +2,7 @@
 from torch import nn
 from functools import partial
 from einops.layers.torch import Rearrange, Reduce
-import layers as L
+from . import layers as L
 
 
 def pair(x): return x if isinstance(x, tuple) else (x, x)
