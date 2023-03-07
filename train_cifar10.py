@@ -33,7 +33,7 @@ import random
 torch.manual_seed(37)
 random.seed(37)
 np.random.seed(37)
-torch.use_deterministic_algorithms(True)
+torch.use_deterministic_algorithms(True, warn_only=True)
 torch.cuda.manual_seed_all(37)
 os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
