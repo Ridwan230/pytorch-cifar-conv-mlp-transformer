@@ -60,6 +60,7 @@ parser.add_argument('--patch', default='4', type=int, help="patch for ViT")
 parser.add_argument('--dimhead', default="512", type=int)
 parser.add_argument('--convkernel', default='8', type=int,
                     help="parameter for convmixer")
+parser.add_argument('--watermark', default='1')
 
 args = parser.parse_args()
 
