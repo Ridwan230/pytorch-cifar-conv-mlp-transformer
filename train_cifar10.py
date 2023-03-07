@@ -68,7 +68,7 @@ args = parser.parse_args()
 usewandb = ~args.nowandb
 if usewandb:
     import wandb
-    watermark = "{}_lr{}".format(args.net, args.lr)
+    watermark = "{}_lr{}".format(args.net, args.watermark)
     wandb.init(project="cifar10-challange",
                name=watermark)
     wandb.config.update(args)
