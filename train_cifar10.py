@@ -135,12 +135,12 @@ g.manual_seed(37)
 #     generator=g)
 
 
-trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(cinic_directory + '/content/train',
+trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder('/content/train',
                                                                            transform=transform_train), batch_size=bs,
                                           shuffle=True, num_workers=2, worker_init_fn=seed_worker,
                                           generator=g)
 
-testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(cinic_directory + '/content/valid',
+testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder('/content/valid',
                                                                           transform=transform_train), batch_size=bs,
                                          shuffle=False, num_workers=2, worker_init_fn=seed_worker,
                                          generator=g)
