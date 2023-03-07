@@ -35,26 +35,31 @@ random.seed(37)
 np.random.seed(37)
 torch.use_deterministic_algorithms(True)
 torch.cuda.manual_seed_all(37)
-os.environ["CUBLAS_WORKSPACE_CONFIG"]=":4096:8"
-
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
 
 # parsers
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
-parser.add_argument('--lr', default=1e-4, type=float, help='learning rate') # resnets.. 1e-3, Vit..1e-4
+parser.add_argument('--lr', default=1e-4, type=float,
+                    help='learning rate')  # resnets.. 1e-3, Vit..1e-4
 parser.add_argument('--opt', default="adam")
-parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-parser.add_argument('--noaug', action='store_true', help='disable use randomaug')
-parser.add_argument('--noamp', action='store_true', help='disable mixed precision training. for older pytorch versions')
+parser.add_argument('--resume', '-r', action='store_true',
+                    help='resume from checkpoint')
+parser.add_argument('--noaug', action='store_true',
+                    help='disable use randomaug')
+parser.add_argument('--noamp', action='store_true',
+                    help='disable mixed precision training. for older pytorch versions')
 parser.add_argument('--nowandb', action='store_true', help='disable wandb')
-parser.add_argument('--mixup', action='store_true', help='add mixup augumentations')
+parser.add_argument('--mixup', action='store_true',
+                    help='add mixup augumentations')
 parser.add_argument('--net', default='vit')
 parser.add_argument('--bs', default='512')
 parser.add_argument('--size', default="32")
 parser.add_argument('--n_epochs', type=int, default='200')
 parser.add_argument('--patch', default='4', type=int, help="patch for ViT")
 parser.add_argument('--dimhead', default="512", type=int)
-parser.add_argument('--convkernel', default='8', type=int, help="parameter for convmixer")
+parser.add_argument('--convkernel', default='8', type=int,
+                    help="parameter for convmixer")
 
 args = parser.parse_args()
 
@@ -64,7 +69,7 @@ if usewandb:
     import wandb
     watermark = "{}_lr{}".format(args.net, args.lr)
     wandb.init(project="cifar10-challange",
-            name=watermark)
+               name=watermark)
     wandb.config.update(args)
 
 bs = int(args.bs)
@@ -79,7 +84,7 @@ start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
 # Data
 print('==> Preparing data..')
-if args.net=="vit_timm":
+if args.net == "vit_timm":
     size = 384
 else:
     size = imsize
@@ -89,163 +94,183 @@ transform_train = transforms.Compose([
     transforms.Resize(size),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    transforms.Normalize((0.47889522, 0.47227842, 0.43047404),
+                         (0.24205776, 0.23828046, 0.25874835)),
 ])
 
 transform_test = transforms.Compose([
     transforms.Resize(size),
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    transforms.Normalize((0.47889522, 0.47227842, 0.43047404),
+                         (0.24205776, 0.23828046, 0.25874835)),
 ])
 
 # Add RandAugment with N, M(hyperparameter)
-if aug:  
-    N = 2; M = 14;
+if aug:
+    N = 2
+    M = 14
     transform_train.transforms.insert(0, RandAugment(N, M))
-    
-#reproduce   
+
+# reproduce
+
+
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
+
 g = torch.Generator()
-g.manual_seed(37) 
+g.manual_seed(37)
 
 
 # Prepare dataset
-trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-#shuffle set to false 
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=bs, shuffle=False, num_workers=2,worker_init_fn=seed_worker,
-    generator=g)
+# trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+# #shuffle set to false
+# trainloader = torch.utils.data.DataLoader(trainset, batch_size=bs, shuffle=False, num_workers=2,worker_init_fn=seed_worker,
+#     generator=g)
 
-testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2,worker_init_fn=seed_worker,
-    generator=g)
+# testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+# testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2,worker_init_fn=seed_worker,
+#     generator=g)
 
-classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
+trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(cinic_directory + '/content/train',
+                                                                           transform=transform_train), batch_size=bs,
+                                          shuffle=True, num_workers=2, worker_init_fn=seed_worker,
+                                          generator=g)
+
+testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(cinic_directory + '/content/valid',
+                                                                          transform=transform_train), batch_size=bs,
+                                         shuffle=False, num_workers=2, worker_init_fn=seed_worker,
+                                         generator=g)
+
+
+classes = ('airplane', 'automobile', 'bird', 'cat',
+           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 # Model factory..
 print('==> Building model..')
 # net = VGG('VGG19')
-if args.net=='res18':
+if args.net == 'res18':
     net = ResNet18()
-elif args.net=='vgg':
+elif args.net == 'vgg':
     net = VGG('VGG19')
-elif args.net=='res34':
+elif args.net == 'res34':
     net = ResNet34()
-elif args.net=='res50':
+elif args.net == 'res50':
     net = ResNet50()
-elif args.net=='res101':
+elif args.net == 'res101':
     net = ResNet101()
-elif args.net=="convmixer":
+elif args.net == "convmixer":
     # from paper, accuracy >96%. you can tune the depth and dim to scale accuracy and speed.
-    net = ConvMixer(256, 16, kernel_size=args.convkernel, patch_size=1, n_classes=10)
-elif args.net=="mlpmixer":
+    net = ConvMixer(256, 16, kernel_size=args.convkernel,
+                    patch_size=1, n_classes=10)
+elif args.net == "mlpmixer":
     from models.mlpmixer import MLPMixer
     net = MLPMixer(
-    image_size = 32,
-    channels = 3,
-    patch_size = args.patch,
-    dim = 512,
-    depth = 6,
-    num_classes = 10
-)
-elif args.net=="vit_small":
+        image_size=32,
+        channels=3,
+        patch_size=args.patch,
+        dim=512,
+        depth=6,
+        num_classes=10
+    )
+elif args.net == "vit_small":
     from models.vit_small import ViT
     net = ViT(
-    image_size = size,
-    patch_size = args.patch,
-    num_classes = 10,
-    dim = int(args.dimhead),
-    depth = 6,
-    heads = 8,
-    mlp_dim = 512,
-    dropout = 0.1,
-    emb_dropout = 0.1
-)
-elif args.net=="vit_tiny":
+        image_size=size,
+        patch_size=args.patch,
+        num_classes=10,
+        dim=int(args.dimhead),
+        depth=6,
+        heads=8,
+        mlp_dim=512,
+        dropout=0.1,
+        emb_dropout=0.1
+    )
+elif args.net == "vit_tiny":
     from models.vit_small import ViT
     net = ViT(
-    image_size = size,
-    patch_size = args.patch,
-    num_classes = 10,
-    dim = int(args.dimhead),
-    depth = 4,
-    heads = 6,
-    mlp_dim = 256,
-    dropout = 0.1,
-    emb_dropout = 0.1
-)
-elif args.net=="simplevit":
+        image_size=size,
+        patch_size=args.patch,
+        num_classes=10,
+        dim=int(args.dimhead),
+        depth=4,
+        heads=6,
+        mlp_dim=256,
+        dropout=0.1,
+        emb_dropout=0.1
+    )
+elif args.net == "simplevit":
     from models.simplevit import SimpleViT
     net = SimpleViT(
-    image_size = size,
-    patch_size = args.patch,
-    num_classes = 10,
-    dim = int(args.dimhead),
-    depth = 6,
-    heads = 8,
-    mlp_dim = 512
-)
-elif args.net=="vit":
+        image_size=size,
+        patch_size=args.patch,
+        num_classes=10,
+        dim=int(args.dimhead),
+        depth=6,
+        heads=8,
+        mlp_dim=512
+    )
+elif args.net == "vit":
     # ViT for cifar10
     net = ViT(
-    image_size = size,
-    patch_size = args.patch,
-    num_classes = 10,
-    dim = int(args.dimhead),
-    depth = 6,
-    heads = 8,
-    mlp_dim = 512,
-    dropout = 0.1,
-    emb_dropout = 0.1
-)
-elif args.net=="vit_timm":
+        image_size=size,
+        patch_size=args.patch,
+        num_classes=10,
+        dim=int(args.dimhead),
+        depth=6,
+        heads=8,
+        mlp_dim=512,
+        dropout=0.1,
+        emb_dropout=0.1
+    )
+elif args.net == "vit_timm":
     import timm
     net = timm.create_model("vit_base_patch16_384", pretrained=True)
     net.head = nn.Linear(net.head.in_features, 10)
-elif args.net=="cait":
+elif args.net == "cait":
     from models.cait import CaiT
     net = CaiT(
-    image_size = size,
-    patch_size = args.patch,
-    num_classes = 10,
-    dim = int(args.dimhead),
-    depth = 6,   # depth of transformer for patch to patch attention only
-    cls_depth=2, # depth of cross attention of CLS tokens to patch
-    heads = 8,
-    mlp_dim = 512,
-    dropout = 0.1,
-    emb_dropout = 0.1,
-    layer_dropout = 0.05
-)
-elif args.net=="cait_small":
+        image_size=size,
+        patch_size=args.patch,
+        num_classes=10,
+        dim=int(args.dimhead),
+        depth=6,   # depth of transformer for patch to patch attention only
+        cls_depth=2,  # depth of cross attention of CLS tokens to patch
+        heads=8,
+        mlp_dim=512,
+        dropout=0.1,
+        emb_dropout=0.1,
+        layer_dropout=0.05
+    )
+elif args.net == "cait_small":
     from models.cait import CaiT
     net = CaiT(
-    image_size = size,
-    patch_size = args.patch,
-    num_classes = 10,
-    dim = int(args.dimhead),
-    depth = 6,   # depth of transformer for patch to patch attention only
-    cls_depth=2, # depth of cross attention of CLS tokens to patch
-    heads = 6,
-    mlp_dim = 256,
-    dropout = 0.1,
-    emb_dropout = 0.1,
-    layer_dropout = 0.05
-)
-elif args.net=="swin":
+        image_size=size,
+        patch_size=args.patch,
+        num_classes=10,
+        dim=int(args.dimhead),
+        depth=6,   # depth of transformer for patch to patch attention only
+        cls_depth=2,  # depth of cross attention of CLS tokens to patch
+        heads=6,
+        mlp_dim=256,
+        dropout=0.1,
+        emb_dropout=0.1,
+        layer_dropout=0.05
+    )
+elif args.net == "swin":
     from models.swin import swin_t
     net = swin_t(window_size=args.patch,
-                num_classes=10,
-                downscaling_factors=(2,2,2,1))
+                 num_classes=10,
+                 downscaling_factors=(2, 2, 2, 1))
 
 # For Multi-GPU
 if 'cuda' in device:
     print(device)
     print("using data parallel")
-    net = torch.nn.DataParallel(net) # make parallel
+    net = torch.nn.DataParallel(net)  # make parallel
     cudnn.benchmark = True
 
 if args.resume:
@@ -263,13 +288,16 @@ criterion = nn.CrossEntropyLoss()
 if args.opt == "adam":
     optimizer = optim.Adam(net.parameters(), lr=args.lr)
 elif args.opt == "sgd":
-    optimizer = optim.SGD(net.parameters(), lr=args.lr)  
-    
-# use cosine scheduling
-scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.n_epochs)
+    optimizer = optim.SGD(net.parameters(), lr=args.lr)
 
-##### Training
+# use cosine scheduling
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    optimizer, args.n_epochs)
+
+# Training
 scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+
+
 def train(epoch):
     print('\nEpoch: %d' % epoch)
     net.train()
@@ -293,10 +321,12 @@ def train(epoch):
         correct += predicted.eq(targets).sum().item()
 
         progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-            % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+                     % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
     return train_loss/(batch_idx+1)
 
-##### Validation
+# Validation
+
+
 def test(epoch):
     global best_acc
     net.eval()
@@ -315,57 +345,59 @@ def test(epoch):
             correct += predicted.eq(targets).sum().item()
 
             progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
-    
+                         % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+
     # Save checkpoint.
     acc = 100.*correct/total
     if acc > best_acc:
         print('Saving..')
         state = {"model": net.state_dict(),
-              "optimizer": optimizer.state_dict(),
-              "scaler": scaler.state_dict()}
+                 "optimizer": optimizer.state_dict(),
+                 "scaler": scaler.state_dict()}
         if not os.path.isdir('checkpoint'):
             os.mkdir('checkpoint')
-        torch.save(state, './checkpoint/'+args.net+'-{}-ckpt.t7'.format(args.patch))
+        torch.save(state, './checkpoint/'+args.net +
+                   '-{}-ckpt.t7'.format(args.patch))
         best_acc = acc
-    
+
     os.makedirs("log", exist_ok=True)
-    content = time.ctime() + ' ' + f'Epoch {epoch}, lr: {optimizer.param_groups[0]["lr"]:.7f}, val loss: {test_loss:.5f}, acc: {(acc):.5f}'
+    content = time.ctime() + ' ' + \
+        f'Epoch {epoch}, lr: {optimizer.param_groups[0]["lr"]:.7f}, val loss: {test_loss:.5f}, acc: {(acc):.5f}'
     print(content)
     with open(f'log/log_{args.net}_patch{args.patch}.txt', 'a') as appender:
         appender.write(content + "\n")
     return test_loss, acc
+
 
 list_loss = []
 list_acc = []
 
 if usewandb:
     wandb.watch(net)
-    
+
 net.cuda()
 for epoch in range(start_epoch, args.n_epochs):
     start = time.time()
     trainloss = train(epoch)
     val_loss, acc = test(epoch)
-    
-    scheduler.step(epoch-1) # step cosine scheduling
-    
+
+    scheduler.step(epoch-1)  # step cosine scheduling
+
     list_loss.append(val_loss)
     list_acc.append(acc)
-    
+
     # Log training..
     if usewandb:
         wandb.log({'epoch': epoch, 'train_loss': trainloss, 'val_loss': val_loss, "val_acc": acc, "lr": optimizer.param_groups[0]["lr"],
-        "epoch_time": time.time()-start})
+                   "epoch_time": time.time()-start})
 
     # Write out csv..
     with open(f'log/log_{args.net}_patch{args.patch}.csv', 'w') as f:
         writer = csv.writer(f, lineterminator='\n')
-        writer.writerow(list_loss) 
-        writer.writerow(list_acc) 
+        writer.writerow(list_loss)
+        writer.writerow(list_acc)
     print(list_loss)
 
 # writeout wandb
 if usewandb:
     wandb.save("wandb_{}.h5".format(args.net))
-    
