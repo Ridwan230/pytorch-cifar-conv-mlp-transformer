@@ -62,6 +62,120 @@ from torch.nn import functional as F
 # LWE
 
 
+# class Conv2d(nn.Conv2d):
+
+#     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+#                  padding=0, dilation=1, groups=1, bias=True):
+#         super(Conv2d, self).__init__(in_channels, out_channels, kernel_size, stride,
+#                                      padding, dilation, groups, bias)
+
+#         self.count = 0
+#         planes = in_channels
+#         self.fc1 = nn.Conv2d(planes//groups, max(planes//16, 1), kernel_size=1)
+#         self.fc2 = nn.Conv2d(max(planes//16, 1), planes//groups, kernel_size=1)
+#         self.eps = 1e-5
+
+#     def forward(self, x):
+#         # return super(Conv2d, self).forward(x) #use this for normal convolution without any WE
+#         weight = self.weight
+
+#         # Following 4 lines are implementation of weight standardization. Optional. Seems to work well, except for depthwise convolution. See paper for more details.
+#         weight_avg = weight.mean(dim=1, keepdim=True).mean(dim=2,
+#                                                            keepdim=True).mean(dim=3, keepdim=True)
+#         weight = weight - weight_avg
+#         std = weight.view(weight.size(
+#             0), -1).std(dim=1).view(-1, 1, 1, 1) + self.eps
+#         weight = weight / std.expand_as(weight)
+
+#         # LWE
+#         wght = F.avg_pool2d(weight, weight.size(2))
+#         wght = F.relu(self.fc1(wght))
+#         wght = F.sigmoid(self.fc2(wght))
+#         weight = weight * wght
+
+#         return F.conv2d(x, weight, self.bias, self.stride,
+#                         self.padding, self.dilation, self.groups)
+class ZPool(nn.Module):
+    def forward(self, x):
+        return torch.cat(
+            (torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1
+        )
+
+
+class BasicConv(nn.Module):
+    def __init__(
+        self,
+        in_planes,
+        out_planes,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        relu=True,
+        bn=True,
+        bias=False,
+    ):
+        super(BasicConv, self).__init__()
+        self.out_channels = out_planes
+        self.conv = nn.Conv2d(
+            in_planes,
+            out_planes,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            groups=groups,
+            bias=bias,
+        )
+        self.bn = (
+            nn.BatchNorm2d(out_planes, eps=1e-5, momentum=0.01, affine=True)
+            if bn
+            else None
+        )
+        self.relu = nn.ReLU() if relu else None
+
+    def forward(self, x):
+        x = self.conv(x)
+        if self.bn is not None:
+            x = self.bn(x)
+        if self.relu is not None:
+            x = self.relu(x)
+        return x
+
+
+class AttentionGate(nn.Module):
+    def __init__(self):
+        super(AttentionGate, self).__init__()
+        kernel_size = 3
+        self.compress = ZPool()
+        self.conv = BasicConv(
+            2, 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2, relu=False
+        )
+
+    def forward(self, x):
+        x_compress = self.compress(x)
+        x_out = self.conv(x_compress)
+        scale = torch.sigmoid_(x_out)
+        return x * scale
+
+
+class TripletAttention(nn.Module):
+    def __init__(self, no_spatial=False):
+        super(TripletAttention, self).__init__()
+        self.cw = AttentionGate()
+        self.hc = AttentionGate()
+
+    def forward(self, x):
+        x_perm1 = x.permute(0, 2, 1, 3).contiguous()
+        x_out1 = self.cw(x_perm1)
+        x_out11 = x_out1.permute(0, 2, 1, 3).contiguous()
+        x_perm2 = x.permute(0, 3, 2, 1).contiguous()
+        x_out2 = self.hc(x_perm2)
+        x_out21 = x_out2.permute(0, 3, 2, 1).contiguous()
+        return (1 / 2 * (x_out11 + x_out21))
+
+
 class Conv2d(nn.Conv2d):
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
@@ -87,11 +201,9 @@ class Conv2d(nn.Conv2d):
             0), -1).std(dim=1).view(-1, 1, 1, 1) + self.eps
         weight = weight / std.expand_as(weight)
 
-        # LWE
-        wght = F.avg_pool2d(weight, weight.size(2))
-        wght = F.relu(self.fc1(wght))
-        wght = F.sigmoid(self.fc2(wght))
-        weight = weight * wght
+        # Triple Attn
+        wght = TripletAttention()
+        weight = weight * wght.forward(weight)
 
         return F.conv2d(x, weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
