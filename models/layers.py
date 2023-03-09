@@ -40,25 +40,32 @@ class Conv2d(nn.Conv2d):
             0), -1).std(dim=1).view(-1, 1, 1, 1) + self.eps
         weight = weight / std.expand_as(weight)
 
-        wght1 = self.avg_pool(weight)
-        wght1 = self.mlp(wght1)
-        wght2 = self.max_pool(weight)
-        wght2 = self.mlp(wght2)
-        wght = torch.sigmoid(wght1+wght2)
-        skip_1 = weight * wght
-        weight = weight + skip_1
+        # wght1 = self.avg_pool(weight)
+        # wght1 = self.mlp(wght1)
+        # wght2 = self.max_pool(weight)
+        # wght2 = self.mlp(wght2)
+        # wght = torch.sigmoid(wght1+wght2)
+        # skip_1 = weight * wght
+        # weight = weight + skip_1
 
-        # spatial attention
-        max_result, _ = torch.max(weight, dim=1, keepdim=True)
-        avg_result = torch.mean(weight, dim=1, keepdim=True)
-        result = torch.cat([max_result, avg_result], 1)
-        wght_2 = self.conv(result)
-        wght_2 = self.sigmoid(wght_2)
-        skip_2 = weight*wght_2
+        # # spatial attention
+        # max_result, _ = torch.max(weight, dim=1, keepdim=True)
+        # avg_result = torch.mean(weight, dim=1, keepdim=True)
+        # result = torch.cat([max_result, avg_result], 1)
+        # wght_2 = self.conv(result)
+        # wght_2 = self.sigmoid(wght_2)
+        # skip_2 = weight*wght_2
 
-        weight = weight + skip_1 + skip_2
+        # weight = weight + skip_1 + skip_2
 
         # Triple Attn
+
+        weight2 = weight
+        x = torch.cat((torch.max(weight2, 1)[0].unsqueeze(
+            1), torch.mean(weight2, 1).unsqueeze(1)), dim=1)
+        x = self.conv(x)
+        x = torch.sigmoid_(x)
+
         weight3 = weight
         x_perm1 = weight3.permute(0, 2, 1, 3).contiguous()
         x_perm1 = torch.cat((torch.max(x_perm1, 1)[0].unsqueeze(
@@ -66,9 +73,6 @@ class Conv2d(nn.Conv2d):
         x_perm1 = self.conv(x_perm1)
         x_perm1 = torch.sigmoid_(x_perm1)
         x_perm1 = x_perm1.permute(0, 2, 1, 3).contiguous()
-        skip_3 = weight3*x_perm1
-
-        weight = weight + skip_1 + skip_2+skip_3
 
         weight4 = weight
         x_perm2 = weight4.permute(0, 3, 2, 1).contiguous()
@@ -77,9 +81,8 @@ class Conv2d(nn.Conv2d):
         x_perm2 = self.conv(x_perm2)
         x_perm2 = torch.sigmoid_(x_perm2)
         x_perm2 = x_perm2.permute(0, 3, 2, 1).contiguous()
-        skip_4 = weight4*x_perm2
 
-        weight = weight + skip_1 + skip_2+skip_3+skip_4
+        weight = weight * ((1/3)*(x+x_perm1+x_perm2))
 
         return F.conv2d(x, weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
