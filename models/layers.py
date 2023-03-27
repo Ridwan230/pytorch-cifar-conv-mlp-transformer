@@ -108,18 +108,18 @@ class Conv2d(nn.Conv2d):
         weight = self.weight
 
         # Following 4 lines are implementation of weight standardization. Optional. Seems to work well, except for depthwise convolution. See paper for more details.
-        weight_avg = weight.mean(dim=1, keepdim=True).mean(dim=2,
-                                                           keepdim=True).mean(dim=3, keepdim=True)
-        weight = weight - weight_avg
-        std = weight.view(weight.size(
-            0), -1).std(dim=1).view(-1, 1, 1, 1) + self.eps
-        weight = weight / std.expand_as(weight)
+        # weight_avg = weight.mean(dim=1, keepdim=True).mean(dim=2,
+        #                                                    keepdim=True).mean(dim=3, keepdim=True)
+        # weight = weight - weight_avg
+        # std = weight.view(weight.size(
+        #     0), -1).std(dim=1).view(-1, 1, 1, 1) + self.eps
+        # weight = weight / std.expand_as(weight)
 
         # LWE
-        # wght = F.avg_pool2d(weight, weight.size(2))
-        # wght = F.relu(self.fc1(wght))
-        # wght = F.sigmoid(self.fc2(wght))
-        # weight = weight * wght
+        wght = F.avg_pool2d(weight, weight.size(2))
+        wght = F.relu(self.fc1(wght))
+        wght = F.sigmoid(self.fc2(wght))
+        weight = weight * wght
 
         return F.conv2d(x, weight, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
