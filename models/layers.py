@@ -21,8 +21,8 @@ class Conv2d(nn.Conv2d):
         max_val = (1.0 + 0.1) * \
             torch.max(torch.max(weight), -1 * torch.min(weight))
         if self.count:
-            weight = max_val * 0.5 * \
-                torch.log((1+weight/max_val) / (1-weight/max_val))
+            weight = (0.5*weight/max_val) / \
+                torch.log10(1+torch.exp(-0.3*weight/max_val))
         else:
             self.count = 1
         return F.conv2d(x, weight, self.bias, self.stride,
