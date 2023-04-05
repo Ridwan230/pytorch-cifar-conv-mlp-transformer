@@ -141,7 +141,7 @@ class Conv2d(nn.Conv2d):
         # return super(Conv2d, self).forward(x) #use this for normal convolution without any WE
         weight = self.weight
 
-        Following 4 lines are implementation of weight standardization. Optional. Seems to work well, except for depthwise convolution. See paper for more details.
+        # Following 4 lines are implementation of weight standardization. Optional. Seems to work well, except for depthwise convolution. See paper for more details.
         weight_avg = weight.mean(dim=1, keepdim=True).mean(dim=2,
                                                            keepdim=True).mean(dim=3, keepdim=True)
         weight = weight - weight_avg
