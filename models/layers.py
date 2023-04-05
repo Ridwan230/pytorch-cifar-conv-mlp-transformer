@@ -67,12 +67,12 @@ class Conv2d(nn.Conv2d):
     def forward(self, x):
 
         weight = self.weight
-        # weight_avg = weight.mean(dim=1, keepdim=True).mean(
-        #     dim=2, keepdim=True).mean(dim=3, keepdim=True)
-        # weight = weight - weight_avg
-        # std = weight.view(weight.size(
-        #     0), -1).std(dim=1).view(-1, 1, 1, 1) + self.eps
-        # weight = weight / std.expand_as(weight)
+        weight_avg = weight.mean(dim=1, keepdim=True).mean(
+            dim=2, keepdim=True).mean(dim=3, keepdim=True)
+        weight = weight - weight_avg
+        std = weight.view(weight.size(
+            0), -1).std(dim=1).view(-1, 1, 1, 1) + self.eps
+        weight = weight / std.expand_as(weight)
 
         wght1 = self.avg_pool(weight)
         wght1 = self.mlp(wght1)
