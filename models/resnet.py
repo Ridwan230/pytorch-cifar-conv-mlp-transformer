@@ -17,11 +17,11 @@ class BasicBlock(nn.Module):
 
     def __init__(self, in_planes, planes, stride=1):
         super(BasicBlock, self).__init__()
-        self.conv1 = L.Conv2d(in_planes, planes, kernel_size=11,
-                               stride=stride, padding=5, bias=False)
+        self.conv1 = L.Conv2d(in_planes, planes, kernel_size=7,
+                               stride=stride, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = L.Conv2d(planes, planes, kernel_size=11,
-                               stride=1, padding=5, bias=False)
+        self.conv2 = L.Conv2d(planes, planes, kernel_size=7,
+                               stride=1, padding=3, bias=False)
         self.bn2 = nn.BatchNorm2d(planes)
 
         self.shortcut = nn.Sequential()
